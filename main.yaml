@@ -1,0 +1,102 @@
+# Evan BITIC
+# Alexis DOUANNES
+# 5SRC1
+
+# Create namespace
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-web
+
+---
+
+# Create app deployment with 
+# - Affinity rules
+# - Resources (base and limits)
+# - Replicas
+# - ...
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: web
+  name: web
+  namespace: ns-web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: city
+                operator: In
+                values:
+                - Paris
+                - Londres
+                - Montreal
+      containers:
+      - image: nginx:latest
+        name: nginx
+        resources:
+          limits:
+            cpu: 100m
+            memory: 200Mi
+          requests:
+            cpu: 50m
+            memory: 100Mi
+
+---
+
+# Create service to expose nginx app
+# NodePort: 30001
+
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ns-web
+  name: web
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    protocol: TCP
+    nodePort: 30001
+  selector:
+    app: web
+
+---
+
+# Create autoscaling rules
+# - max replicas: 10
+# - min replicas: 3
+# - target cpu utilization: 25%
+
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web
+  namespace: ns-web
+spec:
+  maxReplicas: 10
+  minReplicas: 3
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web
+  targetCPUUtilizationPercentage: 25
